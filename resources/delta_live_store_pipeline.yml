@@ -1,0 +1,23 @@
+# The main pipeline for delta_live_store
+
+
+
+resources:
+  pipelines:
+    delta_live_store_pipeline:
+      name: delta_live_store_pipeline
+      catalog: ${var.target_catalog}
+      target: ${var.target_schema}
+      serverless: true
+      continuous: false
+      photon: false
+      edition: ADVANCED
+      channel: PREVIEW
+      libraries:
+        - notebook:
+            path: ../src/delta_live_store_pipeline.ipynb
+
+      configuration:
+        bundle.sourcePath: /Workspace/${workspace.file_path}/src
+        bundle.deltaLiveStoreTable: ${var.delta_live_store_table}
+        bundle.deltaLiveStoreEntityGroup: ${var.delta_live_store_entity_group}

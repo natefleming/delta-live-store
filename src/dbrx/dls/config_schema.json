@@ -1,0 +1,140 @@
+{
+    "$schema": "http://json-schema.org/draft-06/schema#",
+    "$ref": "#/definitions/Welcome1",
+    "definitions": {
+        "Welcome1": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "delta_live_store": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/DeltaLiveStore"
+                    }
+                }
+            },
+            "required": [
+                "delta_live_store"
+            ],
+            "title": "Welcome1"
+        },
+        "DeltaLiveStore": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "entity_id": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "destination_type": {
+                    "type": ["string", "null"],
+                    "enum": ["table", "view"]
+                },
+                "source_format": {
+                    "type": ["string", "null"],
+                    "enum": ["cloudFiles", "kafka", "csv", "json", "parquet", "avro", "orc", "delta", "dlt"]
+                },
+                "is_streaming": {
+                    "type": "boolean"
+                },
+                "source_schema": {
+                    "type": ["string", "null"]
+                },
+                "primary_keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "select_expr": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "read_options": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "table_properties": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": [ "string", "number", "boolean" ]
+                    }
+                },
+                "tags": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": [ "string", "number", "boolean" ]
+                    }
+                },
+                "spark_conf": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": [ "string", "number", "boolean" ]
+                    }
+                },
+                "partition_cols": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "group": {
+                    "type": ["string", "null"]
+                },
+                "comment": {
+                    "type": ["string", "null"]
+                },
+                "is_enabled": {
+                    "type": "boolean"
+                },
+                "is_latest": {
+                    "type": "boolean"
+                },         
+                "is_quarantined": {
+                    "type": "boolean"
+                },
+                "expectations": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "expect_all": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": [ "string", "null" ]
+                            }
+                        },
+                        "expect_all_or_drop": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": [ "string", "null" ]
+                            }
+                        },
+                        "expect_all_or_fail": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": [ "string", "null" ]
+                            }
+                        }
+                    },
+                    "required": [],
+                    "title": "Expectations"
+                }
+            },
+            "required": [
+                "destination",
+                "entity_id",
+                "source"
+            ],
+            "title": "delta_live_store"
+        }
+    }
+}

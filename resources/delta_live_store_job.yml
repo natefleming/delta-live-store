@@ -1,0 +1,59 @@
+# The main job for delta_live_store.
+resources:
+  jobs:
+    delta_live_store_job:
+      name: delta_live_store_job
+
+      schedule:
+        # Run every day at 8:37 AM
+        quartz_cron_expression: '44 37 8 * * ?'
+        timezone_id: Europe/Amsterdam
+
+      email_notifications:
+        on_failure:
+          - nate.fleming@databricks.com
+
+      tasks:
+        - task_key: load_from_volume
+          job_cluster_key: job_cluster
+          notebook_task:
+            notebook_path: ../src/load_from_volume.ipynb
+            base_parameters:
+              deltaLiveStoreTable: ${var.delta_live_store_table}
+              deltaLiveStoreEntityGroup: ${var.delta_live_store_entity_group}
+              volume: ${var.source_volume}
+              host: ${var.host}
+              token: ${var.token}
+
+        - task_key: run_delta_live_store
+          depends_on:
+            - task_key: load_from_volume
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.delta_live_store_pipeline.id}
+          libraries:
+            # By default we just include the .whl file generated for the delta_live_store package.
+            # See https://docs.databricks.com/dev-tools/bundles/library-dependencies.html
+            # for more information on how to add other libraries.
+            - whl: ../dist/*.whl
+
+        # - task_key: main_task
+        #   depends_on:
+        #     - task_key: refresh_pipeline
+        #   job_cluster_key: job_cluster
+        #   python_wheel_task:
+        #     package_name: delta_live_store
+        #     entry_point: main
+        #   libraries:
+        #     # By default we just include the .whl file generated for the delta_live_store package.
+        #     # See https://docs.databricks.com/dev-tools/bundles/library-dependencies.html
+        #     # for more information on how to add other libraries.
+        #     - whl: ../dist/*.whl
+
+      job_clusters:
+        - job_cluster_key: job_cluster
+          new_cluster:
+            spark_version: 13.3.x-scala2.12
+            node_type_id: Standard_D3_v2
+            autoscale:
+                min_workers: 1
+                max_workers: 4

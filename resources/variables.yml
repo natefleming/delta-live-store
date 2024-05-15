@@ -1,0 +1,24 @@
+variables:
+
+  target_catalog: 
+    description: The target catalog for ingested data
+   
+  target_schema: 
+    description: The target schema/database for ingested data
+
+  delta_live_store_table: 
+    description: The location of the Delta Live Store table
+
+  delta_live_store_entity_group: 
+    description: The location of the Delta Live Store Entity group
+    default: ""
+
+  source_volume:
+    description: The source volume for the Delta Live Store
+
+  host:
+    description: The databricks workspace host
+
+  token:
+    description: The access token for the databricks workspace
+    default: ""

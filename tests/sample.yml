@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=../src/dbrx/dls/config_schema.json
+
+delta_live_store:
+  - entity_id: "1"
+    source: /Volumes/nfleming/harbor_freight/data/high_temps
+    destination: high_temps_new
+    destination_type: table
+    source_format: cloudFiles
+    is_streaming: true
+    is_enabled: true
+    source_schema: ~
+    primary_keys: 
+      - id
+    select_expr: []
+    read_options: 
+      cloudFiles.format: csv
+      header: "true"
+    table_properties: {}
+    tags: {}
+    spark_conf: {}
+    partition_cols: []
+    group: main.manufacturing
+    comment: This is the main manufacturing production table.
+    expectations: 
+      expect_all: {}
+      expect_all_or_drop: {}
+      expect_all_or_fail: {}
+    is_quarantined: false
+  - entity_id: "2"
+    source: high_temps_new
+    destination: high_temps_silver
+    destination_type: table
+    source_format: dlt
+    is_streaming: true
+    group: main.manufacturing
+    is_quarantined: True
+    expectations: 
+      expect_all: 
+        temp_gt_50: "temp > 50"
