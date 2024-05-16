@@ -3,12 +3,24 @@ from typing import List
 
 import pytest
 
-from dbrx.dls.filters import (AndPredicate, OrPredicate, Predicate, by_all,
-                              by_created_ts_between, by_destination,
-                              by_destination_type, by_entity_id, by_group,
-                              by_has_tag, by_id, by_is_enabled, by_is_latest,
-                              by_reference_ts, by_source)
-from dbrx.dls.store import DeltaLiveEntity
+from dbrx.dls.filters import (
+    AndPredicate,
+    OrPredicate,
+    Predicate,
+    by_all,
+    by_created_ts_between,
+    by_destination,
+    by_destination_type,
+    by_entity_id,
+    by_group,
+    by_has_tag,
+    by_id,
+    by_is_enabled,
+    by_is_latest,
+    by_reference_ts,
+    by_source,
+)
+from dbrx.dls.models import DeltaLiveEntity
 
 
 @pytest.fixture

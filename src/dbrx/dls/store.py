@@ -1,180 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
-import pandas as pd
-import pyspark.sql.types as T
-from pyspark.sql import DataFrame, Row, SparkSession
+from pyspark.sql import DataFrame, SparkSession
+
+from dbrx.dls.models import DeltaLiveEntity, DeltaLiveEntityList
 
 from .logging import Logger, create_logger
-from .types import (DeltaLiveEntityExpectations, DestinationType, ReadOptions,
-                    SourceFormat, SparkConf, TableProperties, Tags)
+from .types import (  # DeltaLiveEntityExpectations,; ApplyChanges,
+    DestinationType,
+    SourceFormat,
+)
 from .utils import create_session, parse_db_schema_table
 
 logger: Logger = create_logger(__name__)
-
-
-@dataclass
-class DeltaLiveEntity:
-    """
-    Represents a Delta Live entity.
-
-    Attributes:
-        entity_id (str): The ID of the entity.
-        source (str): The source of the entity.
-        destination (str): The destination of the entity.
-        destination_type (DestinationType, optional): The type of the destination. Defaults to "table".
-        source_format (SourceFormat, optional): The format of the source. Defaults to "cloudFiles".
-        is_streaming (bool, optional): Indicates if the entity is streaming. Defaults to True.
-        primary_keys (List[str], optional): The primary keys. Defaults to an empty list.
-        source_schema (str, optional): The schema of the source. Defaults to None.
-        select_expr (List[str], optional): The list of select expressions. Defaults to an empty list.
-        read_options (ReadOptions, optional): The read options for the entity. Defaults to an empty dictionary.
-        table_properties (TableProperties, optional): The properties of the table. Defaults to an empty dictionary.
-        tags (Tags, optional): The tags associated with the entity. Defaults to an empty dictionary.
-        spark_conf (SparkConf, optional): The Spark configuration for the entity. Defaults to an empty dictionary.
-        partition_cols (List[str], optional): The partition columns of the entity. Defaults to an empty list.
-        group (str, optional): The group of the entity. Defaults to None.
-        comment (str, optional): The comment for the entity. Defaults to None.
-        id (str, optional): The ID of the entity. Defaults to None.
-        created_ts (datetime, optional): The timestamp when the entity was created. Defaults to None.
-        expired_ts (datetime, optional): The timestamp when the entity expired. Defaults to None.
-        created_by (str, optional): The user who created the entity. Defaults to None.
-        is_enabled (bool, optional): Indicates if the entity is enabled. Defaults to True.
-        is_latest (bool, optional): Indicates if the entity is the latest version. Defaults to None.
-        hash (bool, optional): The hash value of the entity. Defaults to None.
-        expectations (DeltaLiveEntityExpectations, optional): The expectations for the entity. Valid keys are: expect_all, expect_all_or_drop, expect_all_or_fail. Defaults to an empty dictionary.
-        is_quarantined (bool, optional): Indicates if the entity is will quarantine invalid records. Defaults to False.
-    """
-
-    entity_id: str
-    source: str
-    destination: str
-    destination_type: DestinationType = field(default="table")
-    source_format: SourceFormat = field(default="cloudFiles")
-    is_streaming: bool = True
-    primary_keys: List[str] = field(default_factory=list)
-    source_schema: Optional[str] = None
-    select_expr: List[str] = field(default_factory=list)
-    read_options: ReadOptions = field(default_factory=dict)
-    table_properties: TableProperties = field(default_factory=dict)
-    tags: Tags = field(default_factory=dict)
-    spark_conf: SparkConf = field(default_factory=dict)
-    partition_cols: List[str] = field(default_factory=list)
-    group: Optional[str] = None
-    comment: Optional[str] = None
-    id: Optional[str] = None
-    created_ts: Optional[datetime] = None
-    expired_ts: Optional[datetime] = None
-    created_by: Optional[str] = None
-    modified_by: Optional[str] = None
-    is_enabled: bool = True
-    is_latest: Optional[bool] = None
-    hash: Optional[bool] = None
-    expectations: DeltaLiveEntityExpectations = field(default_factory=dict)
-    is_quarantined: bool = False
-
-    def __post_init__(self):
-        """
-        Post-initialization method.
-        Performs additional initialization logic after the object is created.
-        """
-        if self.source_format in ["cloudFiles", "kafka"]:
-            self.is_streaming = True
-        if self.source_format in ["parquet", "csv", "json", "avro", "orc"]:
-            self.is_streaming = False
-
-        self.group = None if self.group == "" else self.group
-        self.tags = {} if self.tags is None else self.tags
-        self.spark_conf = {} if self.spark_conf is None else self.spark_conf
-        self.partition_cols = [] if self.partition_cols is None else self.partition_cols
-        self.table_properties = (
-            {} if self.table_properties is None else self.table_properties
-        )
-        self.read_options = {} if self.read_options is None else self.read_options
-
-        for key, value in self.expectations.items():
-            if key not in ["expect_all", "expect_all_or_drop", "expect_all_or_fail"]:
-                raise ValueError(
-                    f"Invalid expectation key: {key}. Valid keys are: expect_all, expect_all_or_drop, expect_all_or_fail"
-                )
-            if not isinstance(value, dict):
-                raise ValueError(f"Invalid expectation value: {value}")
-            for k, v in value.items():
-                if not isinstance(k, str) or not isinstance(v, str):
-                    raise ValueError(f"Invalid expectation value: {value}")
-
-    @classmethod
-    def spark_schema(cls) -> T.StructType:
-        """
-        Returns the Spark schema for the Delta Live entity.
-
-        Returns:
-            T.StructType: The Spark schema for the Delta Live entity.
-        """
-        schema: T.StructType = T.StructType(
-            [
-                T.StructField("entity_id", T.StringType(), True),
-                T.StructField("source", T.StringType(), True),
-                T.StructField("destination", T.StringType(), True),
-                T.StructField("destination_type", T.StringType(), True),
-                T.StructField("source_format", T.StringType(), True),
-                T.StructField("is_streaming", T.BooleanType(), True),
-                T.StructField("primary_keys", T.ArrayType(T.StringType()), True),
-                T.StructField("source_schema", T.StringType(), True),
-                T.StructField("select_expr", T.ArrayType(T.StringType()), True),
-                T.StructField(
-                    "read_options", T.MapType(T.StringType(), T.StringType()), True
-                ),
-                T.StructField(
-                    "table_properties", T.MapType(T.StringType(), T.StringType()), True
-                ),
-                T.StructField("tags", T.MapType(T.StringType(), T.StringType()), True),
-                T.StructField(
-                    "spark_conf", T.MapType(T.StringType(), T.StringType()), True
-                ),
-                T.StructField("partition_cols", T.ArrayType(T.StringType()), True),
-                T.StructField("group", T.StringType(), True),
-                T.StructField("comment", T.StringType(), True),
-                T.StructField("id", T.StringType(), True),
-                T.StructField("created_ts", T.TimestampType(), True),
-                T.StructField("expired_ts", T.TimestampType(), True),
-                T.StructField("created_by", T.StringType(), True),
-                T.StructField("modified_by", T.StringType(), True),
-                T.StructField("is_enabled", T.BooleanType(), True),
-                T.StructField("is_latest", T.BooleanType(), True),
-                T.StructField("hash", T.IntegerType(), True),
-                T.StructField(
-                    "expectations",
-                    T.MapType(
-                        T.StringType(), T.MapType(T.StringType(), T.StringType())
-                    ),
-                    True,
-                ),
-                T.StructField("is_quarantined", T.BooleanType(), True),
-            ]
-        )
-        return schema
-
-    def copy(self) -> DeltaLiveEntity:
-        """
-        Creates a copy of the Delta Live entity.
-
-        Returns:
-            DeltaLiveEntity: The copy of the Delta Live entity.
-        """
-        return DeltaLiveEntity(**self.to_dict())
-
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Converts the Delta Live entity to a dictionary.
-
-        Returns:
-            Dict[str, any]: The dictionary representation of the Delta Live entity.
-        """
-        return asdict(self)
 
 
 PRIMARY_KEYS: List[str] = [
@@ -182,6 +21,7 @@ PRIMARY_KEYS: List[str] = [
 ]
 
 PROVIDED_COLUMNS: List[str] = [
+    "apply_changes",
     "comment",
     "destination",
     "destination_type",
@@ -212,122 +52,6 @@ GENERATED_COLUMNS: List[str] = [
     "id",
     "is_latest",
 ]
-
-
-class DeltaLiveEntityList:
-    """
-    Represents a list of Delta Live entities.
-
-    Attributes:
-        entities (List[DeltaLiveEntity]): The list of Delta Live entities.
-        spark (Optional[SparkSession]): The Spark session. Defaults to None.
-    """
-
-    def __init__(
-        self, entities: List[DeltaLiveEntity] = [], spark: Optional[SparkSession] = None
-    ):
-        """
-        Initializes a DeltaLiveEntityList object.
-
-        Args:
-            entities (List[DeltaLiveEntity]): The list of Delta Live entities.
-            spark (Optional[SparkSession], optional): The Spark session. Defaults to None.
-        """
-        self.entities: List[DeltaLiveEntity] = entities
-        self.spark = spark if spark is not None else create_session()
-
-    def filter(
-        self, predicate: Callable[[DeltaLiveEntity], bool]
-    ) -> DeltaLiveEntityList:
-        """
-        Filters the list of entities based on the given predicate.
-
-        Args:
-            predicate (Callable[[DeltaLiveEntity], bool]): The predicate function.
-
-        Returns:
-            DeltaLiveEntityList: The filtered list of entities.
-        """
-        filtered_entries: List[DeltaLiveEntity] = [
-            e for e in self.entities if predicate(e)
-        ]
-        return DeltaLiveEntityList(entities=filtered_entries, spark=self.spark)
-
-    def first(self) -> Optional[DeltaLiveEntity]:
-        """
-        Returns the first entity in the list.
-
-        Returns:
-            Optional[DeltaLiveEntity]: The first entity in the list, or None if the list is empty.
-        """
-        return next(iter(self.entities), None)
-
-    def to_df(self) -> DataFrame:
-        """
-        Converts the list of entities to a Spark DataFrame.
-
-        Returns:
-            DataFrame: The Spark DataFrame representing the list of entities.
-        """
-        rows: List[Row] = [Row(**asdict(entity)) for entity in self.entities]
-        schema: T.StructType = DeltaLiveEntity.spark_schema()
-        return self.spark.createDataFrame(rows, schema=schema)
-
-    def to_pdf(self) -> pd.DataFrame:
-        """
-        Converts the list of entities to a pandas DataFrame.
-
-        Returns:
-            pd.DataFrame: The pandas DataFrame representing the list of entities.
-        """
-        return self.to_df().toPandas()
-
-    def to_list(self) -> List[DeltaLiveEntity]:
-        """
-        Converts the DeltaLiveEntityList to a list.
-
-        Returns:
-            List[DeltaLiveEntity]: The list of Delta Live entities.
-        """
-        return self.entities
-
-    def to_json(self) -> List[Dict[str, Any]]:
-        """
-        Converts the DeltaLiveEntityList to a list of dictionaries.
-
-        Returns:
-            List[Dict[str, Any]]: The list of dictionaries representing the Delta Live entities.
-        """
-        return [entity.to_dict() for entity in self.entities]
-
-    @classmethod
-    def from_df(cls, df: DataFrame) -> DeltaLiveEntityList:
-        rows: List[Row] = df.collect()
-        entities: List[DeltaLiveEntity] = [
-            DeltaLiveEntity(**row.asDict()) for row in rows
-        ]
-        return DeltaLiveEntityList(entities=entities, spark=df.sparkSession)
-
-    def __add__(self, other: DeltaLiveEntityList) -> DeltaLiveEntityList:
-        return DeltaLiveEntityList(
-            entities=[*self.entities, *other.entities], spark=self.spark
-        )
-
-    def __iadd__(self, other: DeltaLiveEntityList) -> DeltaLiveEntityList:
-        self.entities.extend(other.entities)
-        return self
-
-    def __iter__(self):
-        return iter(self.entities)
-
-    def __len__(self):
-        return len(self.entities)
-
-    def __getitem__(self, key):
-        return self.entities[key]
-
-    def __repr__(self):
-        return f"DeltaLiveEntityList({self.entities})"
 
 
 class DeltaLiveStore:
@@ -393,7 +117,24 @@ class DeltaLiveStore:
                 read_options MAP<STRING, STRING>,
                 table_properties MAP<STRING, STRING>,
                 tags MAP<STRING, STRING>,
-                expectations MAP<STRING, MAP<STRING, STRING>>,
+                expectations STRUCT<
+                    expect_all: MAP<STRING, STRING>,
+                    expect_all_or_drop: MAP<STRING, STRING>,
+                    expect_all_or_fail: MAP<STRING, STRING>>,
+                apply_changes STRUCT<
+                    sequence_by: STRING,
+                    where: STRING,
+                    ignore_null_updates: BOOLEAN,
+                    apply_as_deletes: STRING,
+                    apply_as_truncates: STRING,
+                    column_list: ARRAY<STRING>,
+                    except_column_list: ARRAY<STRING>,
+                    stored_as_scd_type: INTEGER,
+                    track_history_column_list: ARRAY<STRING>,
+                    track_history_except_column_list: ARRAY<STRING>,
+                    flow_name: STRING,
+                    ignore_null_updates_column_list: ARRAY<STRING>,
+                    ignore_null_updates_except_column_list: ARRAY<STRING>>,
                 is_quarantined BOOLEAN,
                 spark_conf MAP<STRING, STRING>,
                 partition_cols ARRAY<STRING>,
@@ -640,8 +381,7 @@ class DeltaLiveStore:
             predicate (Callable[[DeltaLiveEntity], bool]): The predicate function.
             enabled (bool): The enabled status to set for the entities.
         """
-        from .filters import (Predicate, by_destination, by_is_enabled,
-                              by_source)
+        from .filters import Predicate, by_destination, by_is_enabled, by_source
 
         predicate_factory: Callable[[DeltaLiveEntity], Predicate]
         if enabled:

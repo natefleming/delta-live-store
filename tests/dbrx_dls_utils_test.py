@@ -1,7 +1,22 @@
 from typing import Any, Dict
 
-from dbrx.dls.utils import (create_session, load_config_schema,
-                            parse_db_schema_table)
+from dbrx.dls.utils import (
+    create_session,
+    load_config_schema,
+    parse_db_schema_table,
+    remove_null_values,
+)
+
+
+def test_remove_null_values() -> None:
+    d: Dict[str, Any] = {
+        "a": 1,
+        "b": None,
+        "c": "value",
+        "d": {"x": None, "y": "nested"},
+    }
+    remove_null_values(d)
+    assert d == {"a": 1, "c": "value", "d": {"y": "nested"}}
 
 
 def test_load_config_schema() -> None:

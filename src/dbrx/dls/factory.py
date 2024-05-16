@@ -5,7 +5,8 @@ from pyspark.sql import DataFrame, SparkSession
 
 from .filters import Predicate, by_destination, by_is_enabled, by_is_latest
 from .logging import Logger, create_logger
-from .store import DeltaLiveEntity, DeltaLiveStore
+from .models import DeltaLiveEntity
+from .store import DeltaLiveStore
 from .utils import create_session
 
 logger: Logger = create_logger(__name__)

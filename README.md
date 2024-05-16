@@ -68,8 +68,9 @@ dbfs:/Volumes/main/etl/data/dataset3/
 ```
 
 ```python
-from dbrx.dls.store import DeltaLiveStore, DeltaLiveEntity
-from dbrx.dls.loader import (
+from dbrx.dls.store import DeltaLiveStore
+from dbrx.dls.models import DeltaLiveEntity
+from dbrx.dls.loaders import (
    DeltaLiveStoreLoader, 
    FileServiceLoader, 
    entity_from_directory_entry, 
@@ -104,7 +105,7 @@ loader.load(store)
 
 ```python
 from dbrx.dls.store import DeltaLiveStore
-from dbrx.dls.loader import DeltaLiveStoreLoader, YamlLoader
+from dbrx.dls.loaders import DeltaLiveStoreLoader, YamlLoader
 
 delta_live_store_table: str = "<catalog>.<table>.<name>" # ie. main.etl.control_table
 config_path: str = "/path/to/config/file.yml"
@@ -207,7 +208,8 @@ DeltaLiveStore allows entities to be enabled and disabled. This action will be a
 
 
 ```python
-from dbrx.dls.store import DeltaLiveStore, DeltaLiveEntity
+from dbrx.dls.store import DeltaLiveStore
+from dbrx.dls.models import DeltaLiveEntity
 from dbrx.dls.filters import Predicate, by_entitiy_id
 from dbrx.dls.pipeline import DeltaLiveStorePipeline
 
@@ -276,6 +278,8 @@ delta_live_store:
     source: dataset1_bronze
     destination: dataset1_silver
     destination_type: table
+    primary_keys:
+      - id
     source_format: dlt
     is_streaming: true
     group: main.etl
@@ -283,7 +287,9 @@ delta_live_store:
     expectations: 
       expect_all: 
         temp_gt_50: "temp > 50"
-
+    apply_changes:
+      sequence_by: "my_seq_num"
+      stored_as_scd_type: 2
 ```
 
 

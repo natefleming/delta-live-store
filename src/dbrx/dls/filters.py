@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Callable
 
-from .store import DeltaLiveEntity
+from .models import DeltaLiveEntity
 from .types import DestinationType
 
 

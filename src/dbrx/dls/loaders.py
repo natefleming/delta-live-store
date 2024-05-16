@@ -10,12 +10,11 @@ from databricks.sdk import WorkspaceClient
 from jsonschema import ValidationError, validate
 from pyspark.sql import DataFrame
 
-from .filters import (Predicate, by_entity_id, by_group, by_is_enabled,
-                      by_is_latest)
+from .filters import Predicate, by_entity_id, by_group, by_is_enabled, by_is_latest
 from .logging import Logger, create_logger
-from .store import (GENERATED_COLUMNS, DeltaLiveEntity, DeltaLiveEntityList,
-                    DeltaLiveStore)
-from .utils import load_config_schema
+from .models import DeltaLiveEntity, DeltaLiveEntityList
+from .store import GENERATED_COLUMNS, DeltaLiveStore
+from .utils import load_config_schema, remove_null_values
 
 logger: Logger = create_logger(__name__)
 
@@ -307,10 +306,11 @@ class YamlLoader(DeltaLiveStoreLoader):
         path = path if path is not None else self.path
         logger.info(f"Storing entities to {path}")
         entities: List[Dict[str, Any]] = store.find_entities(by_is_latest()).to_json()
+        entity: Dict[str, Any]
         for entity in entities:
             for column in GENERATED_COLUMNS:
                 entity.pop(column, None)
-
+            remove_null_values(entity)
         data: Dict[str, Any] = {"delta_live_store": entities}
 
         logger.debug(f"Entities: {json.dumps(data, indent=2)}")

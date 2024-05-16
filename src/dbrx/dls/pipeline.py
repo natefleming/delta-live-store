@@ -9,8 +9,15 @@ from pyspark.sql import DataFrame, SparkSession
 from .factory import DataFrameFactory
 from .filters import Predicate, by_is_enabled, by_is_latest
 from .logging import Logger, create_logger
-from .store import DeltaLiveEntity, DeltaLiveEntityList, DeltaLiveStore
-from .types import DeltaLiveEntityExpectations
+from .models import (
+    DeltaLiveEntity,
+    ApplyChanges,
+    Expectations,
+    DeltaLiveEntityList,
+)
+from .store import DeltaLiveStore
+
+# from .types import DeltaLiveEntityExpectations
 from .utils import create_session
 
 logger: Logger = create_logger(__name__)
@@ -19,14 +26,14 @@ QUARANTINE_COL: str = "is_quarantined"
 
 
 def can_quarantine(entity: DeltaLiveEntity) -> bool:
-    expect_all: Dict[str, str] = entity.expectations.get("expect_all", {})
+    expect_all: Dict[str, str] = entity.expectations.expect_all
     quarantine: bool = entity.is_quarantined and bool(expect_all)
     logger.debug(f"Can quarantine: {quarantine}")
     return quarantine
 
 
 def quarantine_rules(entity: DeltaLiveEntity) -> str:
-    expect_all: Dict[str, str] = entity.expectations.get("expect_all", {})
+    expect_all: Dict[str, str] = entity.expectations.expect_all
     rules: str = (
         "NOT({0})".format(" AND ".join(expect_all.values()))
         if can_quarantine(entity)
@@ -34,6 +41,11 @@ def quarantine_rules(entity: DeltaLiveEntity) -> str:
     )
     logger.debug(f"Quarantine rules: {rules}")
     return rules
+
+
+def has_scd(entity: DeltaLiveEntity) -> bool:
+    scd: bool = bool(entity.primary_keys) and bool(entity.apply_changes)
+    return scd
 
 
 class DeltaLiveStorePipeline:
@@ -108,8 +120,6 @@ class DeltaLiveStorePipeline:
         """
         logger.info(f"Generating table for entity: {entity.entity_id}")
 
-        entity_expectations: DeltaLiveEntityExpectations = entity.expectations
-
         partition_cols: List[str] = entity.partition_cols
         name: str = entity.destination
         quarantine_name: str = f"{name}_quarantine"
@@ -117,26 +127,76 @@ class DeltaLiveStorePipeline:
 
         if can_quarantine(entity):
 
-            partition_cols = [QUARANTINE_COL] + partition_cols
-
-            @dlt.table(name=name, partition_cols=entity.partition_cols)
-            def valid_data():
-                df: DataFrame = (
-                    dlt.readStream(name) if entity.is_streaming else dlt.read(name)
-                )
-                return df.filter(f"{QUARANTINE_COL}=false").drop(
-                    QUARANTINE_COL, "_rescued_data"
-                )
-
-            @dlt.table(name=invalid_name, partition_cols=entity.partition_cols)
-            def invalid_data():
-                df: DataFrame = (
-                    dlt.readStream(name) if entity.is_streaming else dlt.read(name)
-                )
-                return df.filter(f"{QUARANTINE_COL}=true").drop(QUARANTINE_COL)
+            self._create_quarantine_tables(
+                valid_name=name,
+                invalid_name=invalid_name,
+                quarantine_name=quarantine_name,
+                entity=entity,
+            )
 
             name = quarantine_name
+            partition_cols = [QUARANTINE_COL] + partition_cols
 
+        if has_scd(entity):
+            self._create_scd_table(name, partition_cols, entity)
+        else:
+            self._create_table(name, partition_cols, entity)
+
+    def generate_view(self, entity: DeltaLiveEntity) -> None:
+        """
+        Generates a view for the specified entity.
+
+        Args:
+            entity: The DeltaLiveEntity instance representing the entity to generate a view for.
+        """
+        logger.info(f"Generating view for entity: {entity.entity_id}")
+
+        entity_expectations: Expectations = entity.expectations
+
+        @dlt.view(
+            name=entity.destination,
+            comment=entity.comment,
+            spark_conf=entity.spark_conf,
+        )
+        @dlt.expect_all(expectations=entity_expectations.expect_all)
+        @dlt.expect_all_or_drop(expectations=entity_expectations.expect_all_or_drop)
+        @dlt.expect_all_or_fail(expectations=entity_expectations.expect_all_or_fail)
+        def _():
+            df: DataFrame = DataFrameFactory(entity, spark=self.spark).create()
+            return df
+
+    def _create_quarantine_tables(
+        self,
+        valid_name: str,
+        invalid_name: str,
+        quarantine_name: str,
+        entity: DeltaLiveEntity,
+    ):
+        @dlt.table(name=valid_name, partition_cols=entity.partition_cols)
+        def valid_data():
+            df: DataFrame = (
+                dlt.readStream(quarantine_name)
+                if entity.is_streaming and not has_scd(entity)
+                else dlt.read(quarantine_name)
+            )
+            return df.filter(f"{QUARANTINE_COL}=false").drop(
+                QUARANTINE_COL, "_rescued_data"
+            )
+
+        @dlt.table(name=invalid_name, partition_cols=entity.partition_cols)
+        def invalid_data():
+            df: DataFrame = (
+                dlt.readStream(quarantine_name)
+                if entity.is_streaming and not has_scd(entity)
+                else dlt.read(quarantine_name)
+            )
+            return df.filter(f"{QUARANTINE_COL}=true").drop(QUARANTINE_COL)
+
+    def _create_table(
+        self, name: str, partition_cols: List[str], entity: DeltaLiveEntity
+    ):
+        logger.debug(f"Creating table: {name}")
+        entity_expectations: Expectations = entity.expectations
         is_temporary: bool = entity.is_quarantined
 
         @dlt.table(
@@ -148,13 +208,9 @@ class DeltaLiveStorePipeline:
             spark_conf=entity.spark_conf,
             temporary=is_temporary,
         )
-        @dlt.expect_all(expectations=entity_expectations.get("expect_all", {}))
-        @dlt.expect_all_or_drop(
-            expectations=entity_expectations.get("expect_all_or_drop", {})
-        )
-        @dlt.expect_all_or_fail(
-            expectations=entity_expectations.get("expect_all_or_fail", {})
-        )
+        @dlt.expect_all(expectations=entity_expectations.expect_all)
+        @dlt.expect_all_or_drop(expectations=entity_expectations.expect_all_or_drop)
+        @dlt.expect_all_or_fail(expectations=entity_expectations.expect_all_or_fail)
         def target_table():
             factory: DataFrameFactory = DataFrameFactory(
                 entity, store=self.store, spark=self.spark
@@ -165,29 +221,38 @@ class DeltaLiveStorePipeline:
                 df = df.withColumn(QUARANTINE_COL, F.expr(rules))
             return df
 
-    def generate_view(self, entity: DeltaLiveEntity) -> None:
-        """
-        Generates a view for the specified entity.
+    def _create_scd_table(
+        self, name: str, partition_cols: List[str], entity: DeltaLiveEntity
+    ):
+        logger.debug(f"Creating SCD table: {name}")
+        entity_expectations: Expectations = entity.expectations
 
-        Args:
-            entity: The DeltaLiveEntity instance representing the entity to generate a view for.
-        """
-        logger.info(f"Generating view for entity: {entity.entity_id}")
-
-        entity_expectations: DeltaLiveEntityExpectations = entity.expectations
-
-        @dlt.view(
-            name=entity.destination,
+        dlt.create_streaming_table(
+            name=name,
+            schema=entity.source_schema,
             comment=entity.comment,
+            partition_cols=partition_cols,
+            table_properties=entity.table_properties,
             spark_conf=entity.spark_conf,
+            expect_all=entity_expectations.expect_all,
+            expect_all_or_drop=entity_expectations.expect_all_or_drop,
+            expect_all_or_fail=entity_expectations.expect_all_or_fail,
         )
-        @dlt.expect_all(expectations=entity_expectations.get("expect_all", {}))
-        @dlt.expect_all_or_drop(
-            expectations=entity_expectations.get("expect_all_or_drop", {})
+        dlt.apply_changes(
+            target=name,
+            source=entity.source,
+            keys=entity.primary_keys,
+            sequence_by=entity.apply_changes.sequence_by,
+            where=entity.apply_changes.where,
+            ignore_null_updates=entity.apply_changes.ignore_null_updates,
+            apply_as_deletes=entity.apply_changes.apply_as_deletes,
+            apply_as_truncates=entity.apply_changes.apply_as_truncates,
+            column_list=entity.apply_changes.column_list,
+            except_column_list=entity.apply_changes.except_column_list,
+            stored_as_scd_type=entity.apply_changes.stored_as_scd_type,
+            track_history_column_list=entity.apply_changes.track_history_column_list,
+            track_history_except_column_list=entity.apply_changes.track_history_except_column_list,
+            flow_name=entity.apply_changes.flow_name,
+            ignore_null_updates_column_list=entity.apply_changes.ignore_null_updates_column_list,
+            ignore_null_updates_except_column_list=entity.apply_changes.ignore_null_updates_except_column_list,
         )
-        @dlt.expect_all_or_fail(
-            expectations=entity_expectations.get("expect_all_or_fail", {})
-        )
-        def _():
-            df: DataFrame = DataFrameFactory(entity, spark=self.spark).create()
-            return df

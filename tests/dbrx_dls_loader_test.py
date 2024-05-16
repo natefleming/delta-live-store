@@ -4,8 +4,10 @@ from typing import Generator
 import pytest
 
 from dbrx.dls.filters import by_is_latest
-from dbrx.dls.loader import DeltaLiveStoreLoader, FileServiceLoader, YamlLoader
-from dbrx.dls.store import DeltaLiveEntity, DeltaLiveEntityList, DeltaLiveStore
+from dbrx.dls.loaders import DeltaLiveStoreLoader, FileServiceLoader, YamlLoader
+from dbrx.dls.models import DeltaLiveEntity, DeltaLiveEntityList
+from dbrx.dls.store import DeltaLiveStore
+from databricks.sdk import WorkspaceClient
 
 
 @pytest.mark.skipif(
@@ -16,10 +18,17 @@ from dbrx.dls.store import DeltaLiveEntity, DeltaLiveEntityList, DeltaLiveStore
     not os.environ.get("DELTA_LIVE_STORE_TEST_TABLE_NAME"),
     reason="DELTA_LIVE_STORE_TEST_TABLE_NAME is not set",
 )
-def test_file_system_loader(delta_live_store: DeltaLiveStore, volume_path: str) -> None:
+def test_file_system_loader(
+    delta_live_store: DeltaLiveStore,
+    volume_path: str,
+    workspace_client: WorkspaceClient,
+) -> None:
+    actual_datset_count: int = len(
+        list(workspace_client.files.list_directory_contents(volume_path))
+    )
     loader: DeltaLiveStoreLoader = FileServiceLoader(volume_path)
     loader.load(delta_live_store)
-    assert len(delta_live_store.find_entities().to_list()) == 1
+    assert len(delta_live_store.find_entities().to_list()) == actual_datset_count
     assert True
 
 

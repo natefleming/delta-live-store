@@ -1,4 +1,4 @@
-from typing import Dict, Literal
+from typing import Any, Dict, Literal
 
 DestinationType = Literal[
     "view",
@@ -26,5 +26,3 @@ TableProperties = Dict[str, str]
 Tags = Dict[str, str]
 
 SparkConf = Dict[str, str]
-
-DeltaLiveEntityExpectations = Dict[str, Dict[str, str]]

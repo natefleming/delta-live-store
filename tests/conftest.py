@@ -2,8 +2,11 @@ import os
 from typing import Generator
 
 import pytest
+from pyspark.sql import SparkSession
 
 from dbrx.dls.store import DeltaLiveStore
+from dbrx.dls.utils import create_session
+from databricks.sdk import WorkspaceClient
 
 
 @pytest.fixture()
@@ -34,3 +37,15 @@ def delta_live_store(table_name: str) -> Generator[DeltaLiveStore, None, None]:
     yield control
     control.destroy()
     control = None
+
+
+@pytest.fixture(scope="session")
+def spark() -> Generator[SparkSession, None, None]:
+    spark: SparkSession = create_session()
+    yield spark
+    spark.stop()
+
+
+@pytest.fixture(scope="session")
+def workspace_client() -> WorkspaceClient:
+    return WorkspaceClient()

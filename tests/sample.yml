@@ -37,3 +37,6 @@ delta_live_store:
     expectations: 
       expect_all: 
         temp_gt_50: "temp > 50"
+    apply_changes:
+      sequence_by: "id"
+    

@@ -5,23 +5,28 @@ import pytest
 from pyspark.sql import DataFrame
 
 from dbrx.dls.filters import by_all, by_entity_id, by_source
-from dbrx.dls.store import DeltaLiveEntity, DeltaLiveEntityList, DeltaLiveStore
-from dbrx.dls.types import DeltaLiveEntityExpectations
+from dbrx.dls.models import (
+    DeltaLiveEntity,
+    ApplyChanges,
+    Expectations,
+    DeltaLiveEntityList,
+)
+from dbrx.dls.store import DeltaLiveStore
 
 
 @pytest.fixture
-def new_delta_live_entity_expectations() -> DeltaLiveEntityExpectations:
-    expectations: Dict[str, Dict[str, str]] = {
-        "expect_all": {"constraint_1": "1==1"},
-        "expect_all_or_drop": {"constraint_2": "1==1"},
-        "expect_all_or_fail": {"constraint_3": "1==1"},
-    }
+def new_delta_live_entity_expectations() -> Expectations:
+    expectations: Expectations = Expectations(
+        expect_all={"constraint_1": "1==1"},
+        expect_all_or_drop={"constraint_2": "1==1"},
+        expect_all_or_fail={"constraint_3": "1==1"},
+    )
     return expectations
 
 
 @pytest.fixture
 def new_delta_live_entity(
-    new_delta_live_entity_expectations: DeltaLiveEntityExpectations,
+    new_delta_live_entity_expectations: Expectations,
 ) -> DeltaLiveEntity:
     return DeltaLiveEntity(
         entity_id="1",
@@ -115,12 +120,13 @@ def test_control_entity_list_to_df(
 def test_control_upsert(
     delta_live_store: DeltaLiveStore,
     new_delta_live_entity: DeltaLiveEntity,
-    new_delta_live_entity_expectations: DeltaLiveEntityExpectations,
+    new_delta_live_entity_expectations: Expectations,
 ) -> None:
     delta_live_store.upsert(new_delta_live_entity)
     entities: DeltaLiveEntityList = delta_live_store.find_entities(by_all())
     assert len(entities.to_list()) == 1
-    assert entities.first().expectations == new_delta_live_entity_expectations
+    actual_expectations: Expectations = entities.first().expectations
+    assert actual_expectations == new_delta_live_entity_expectations
 
 
 @pytest.mark.skipif(

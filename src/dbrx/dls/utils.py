@@ -5,6 +5,7 @@ from typing import Any, Dict, Tuple
 
 from databricks.connect import DatabricksSession
 from pyspark.sql import SparkSession
+from typing import Union
 
 
 def create_session() -> SparkSession:
@@ -16,7 +17,6 @@ def create_session() -> SparkSession:
     """
     session: SparkSession
     try:
-
         session = DatabricksSession.builder.getOrCreate()
     except ImportError:
         session = SparkSession.builder.getOrCreate()
@@ -57,3 +57,22 @@ def load_config_schema() -> Dict[str, Any]:
         str: The configuration schema as a string.
     """
     return json.loads(pkg_resources.read_text("dbrx.dls", "config_schema.json"))
+
+
+def remove_null_values(d: Dict[str, Any]) -> None:
+    """
+    Recursively remove all keys from a dictionary where the values are None.
+    If the value is a dictionary, the function will recurse into that dictionary.
+    """
+    if not isinstance(d, dict):
+        return d
+
+    keys_to_remove = []
+    for k, v in d.items():
+        if isinstance(v, dict):
+            remove_null_values(v)
+        elif v is None:
+            keys_to_remove.append(k)
+
+    for k in keys_to_remove:
+        del d[k]

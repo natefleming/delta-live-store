@@ -103,23 +103,23 @@
                     "type": "boolean"
                 },
                 "expectations": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "additionalProperties": false,
                     "properties": {
                         "expect_all": {
-                            "type": "object",
+                            "type": ["object", "null"],
                             "additionalProperties": {
                                 "type": [ "string", "null" ]
                             }
                         },
                         "expect_all_or_drop": {
-                            "type": "object",
+                            "type": ["object", "null"],
                             "additionalProperties": {
                                 "type": [ "string", "null" ]
                             }
                         },
                         "expect_all_or_fail": {
-                            "type": "object",
+                            "type": ["object", "null"],
                             "additionalProperties": {
                                 "type": [ "string", "null" ]
                             }
@@ -127,6 +127,75 @@
                     },
                     "required": [],
                     "title": "Expectations"
+                },
+                "apply_changes": {
+                    "type": ["object", "null"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "sequence_by": {
+                            "type": "string"
+                        },
+                        "where": {
+                            "type": ["string", "null"]
+                        },
+                        "ignore_null_updates": {
+                            "type": ["boolean", "null"]
+                        },
+                        "apply_as_deletes": {
+                            "type": ["string", "null"]
+                        },
+                        "apply_as_truncates": {
+                            "type": ["string", "null"]
+                        },
+                        "column_list": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "except_column_list": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "stored_as_scd_type": {
+                            "type": ["integer", "null"],
+                            "enum": [1, 2, null]
+                        },
+                        "track_history_column_list": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "track_history_except_column_list": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "flow_name": {
+                            "type": ["string", "null"]
+                        },
+                        "once": {
+                            "type": "boolean"
+                        },
+                        "ignore_null_updates_column_list": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "ignore_null_updates_except_column_list": {
+                            "type": ["array", "null"],
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "required": ["sequence_by"],
+                    "title": "ApplyChanges"
                 }
             },
             "required": [

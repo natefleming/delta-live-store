@@ -5,7 +5,7 @@ import dlt
 from pyspark.sql import DataFrame
 
 from .logging import Logger, create_logger
-from .store import DeltaLiveEntity
+from .models import DeltaLiveEntity
 from .types import DeltaLiveEntityExpectations
 
 logger: Logger = create_logger(__name__)
