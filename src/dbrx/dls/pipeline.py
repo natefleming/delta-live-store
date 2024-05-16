@@ -27,7 +27,7 @@ QUARANTINE_COL: str = "is_quarantined"
 
 def can_quarantine(entity: DeltaLiveEntity) -> bool:
     expect_all: Dict[str, str] = entity.expectations.expect_all
-    quarantine: bool = entity.is_quarantined and bool(expect_all)
+    quarantine: bool = entity.is_quarantined and bool(expect_all) and not has_scd(entity)
     logger.debug(f"Can quarantine: {quarantine}")
     return quarantine
 
