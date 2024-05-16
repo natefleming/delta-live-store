@@ -243,6 +243,13 @@ class DeltaLiveStore:
         logger.debug(f"Disabling entities matching predicate: {predicate}")
         self._update_enabled(predicate, False)
 
+    def sync(self) -> None:
+        """
+        Synchronizes the store by marking both history and latest as dirty.
+        """
+        self._is_history_dirty = True
+        self._is_latest_dirty = True
+        
     def upsert(self, entity: DeltaLiveEntity, *additional: DeltaLiveEntity) -> None:
         """
         Upserts the given entities into the store.
