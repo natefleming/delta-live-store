@@ -24,6 +24,10 @@ The project is structured around the creation and management of Delta Live Table
 - **Databricks Asset Bundles**: Facilitates the deployment of notebooks, libraries, and configurations in Databricks.
 - **Databricks-Connect**: Allows for connecting and executing Spark code from local development environments to remote Databricks clusters.
 
+## Current Limitations
+
+- At the moment *expectations* and *quarantine* tables are not compatible with *apply_changes* (SCD1/SCD2). 
+
 ## Setup and Installation
 
 ### Development Setup
