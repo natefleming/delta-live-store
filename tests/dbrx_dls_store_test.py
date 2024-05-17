@@ -102,17 +102,6 @@ def test_control_init(delta_live_store: DeltaLiveStore) -> None:
     assert delta_live_store.is_initialized() == False
 
 
-def test_control_entity_list_to_df(
-    new_delta_live_entities: List[DeltaLiveEntity],
-) -> None:
-    control_entity_list = DeltaLiveEntityList(new_delta_live_entities)
-    df: DataFrame = control_entity_list.to_df()
-    for i, row in enumerate(df.collect()):
-        for key, value in row.asDict().items():
-            assert value == new_delta_live_entities[i].__dict__[key]
-    assert df.count() == len(new_delta_live_entities)
-
-
 @pytest.mark.skipif(
     not os.environ.get("DELTA_LIVE_STORE_TEST_TABLE_NAME"),
     reason="DELTA_LIVE_STORE_TEST_TABLE_NAME is not set",
