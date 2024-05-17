@@ -51,6 +51,16 @@ Deployment is handled through the Databricks CLI, configured to manage and deplo
 databricks -p default bundle --var "delta_live_store_table=main.etl.control_table" --var "target_catalog=main" --var "target_schema=etl" --var "source_volume=/Volumes/main/etl/data" --var "host=https://<databricks-host>" deploy
 ```
 
+An example Databricks Asset Bundle deployment descriptor is provided in databricks.yml and resources/*.yml  
+Modify/Duplicate these configuration files to change the deployment stragegy.  
+
+The following parameterized notebooks have been provided for reuse within DAB pipelines and jobs.
+
+- [delta_live_store_pipeline](src/delta_live_store_pipeline.ipynb)
+- [load_from_list](src/load_from_list.ipynb)
+- [load_from_volume](src/load_from_volume.ipynb)
+- [load_from_yaml](src/load_from_yaml.ipynb)
+
 This command sets up the necessary variables and points to the specific Databricks job and host for deployment, ensuring that all components are correctly configured and deployed to the specified Databricks environment.
 
 ## Conclusion
