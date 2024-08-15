@@ -7,6 +7,7 @@ __pycache__/
 scratch/**
 !scratch/README.md
 
+
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,pycharm,vim,macos,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,pycharm,vim,macos,python
 
